@@ -1,36 +1,44 @@
 /// <reference types="@workadventure/iframe-api-typings" />
 
-import { bootstrapExtra } from "@workadventure/scripting-api-extra";
+import {ActionMessage} from "@workadventure/iframe-api-typings";
 
 console.log('Script started successfully');
 
-let currentPopup: any = undefined;
-
 // Waiting for the API to be ready
 WA.onInit().then(() => {
-    console.log('Scripting API ready');
-    console.log('Player tags: ',WA.player.tags)
+    let actionMessage: ActionMessage | undefined;
 
-    WA.room.area.onEnter('clock').subscribe(() => {
-        const today = new Date();
-        const time = today.getHours() + ":" + today.getMinutes();
-        currentPopup = WA.ui.openPopup("clockPopup", "It's " + time, []);
-    })
+    // When someone enters the bellZone area
+    WA.room.area.onEnter("bellZone").subscribe(() => {
+        // Display the action message
+        actionMessage = WA.ui.displayActionMessage({
+            type: "message",
+            message: "Press SPACE to ring the bell",
+            callback: () => {
+                // When space is pressed, we send a "bell-rang" signal to everyone on the map.
+                WA.event.broadcast("bell-rang", {});
+            }
+        });
+    });
 
-    WA.room.area.onLeave('clock').subscribe(closePopup)
+    // When someone leaves the bellZone area
+    WA.room.area.onLeave("bellZone").subscribe(() => {
+        if (actionMessage !== undefined) {
+            // Hide the action message
+            actionMessage.remove();
+            actionMessage = undefined;
+        }
+    });
 
-    // The line below bootstraps the Scripting API Extra library that adds a number of advanced properties/features to WorkAdventure
-    bootstrapExtra().then(() => {
-        console.log('Scripting API Extra ready');
-    }).catch(e => console.error(e));
+
+    const bellSound = WA.sound.loadSound("sounds/door-bell-1.mp3");
+
+    // When the bell-rang event is received
+    WA.event.on("bell-rang").subscribe(({name, data, senderId}) => {
+        // Play the sound of the bell
+        bellSound.play({})
+    });
 
 }).catch(e => console.error(e));
-
-function closePopup(){
-    if (currentPopup !== undefined) {
-        currentPopup.close();
-        currentPopup = undefined;
-    }
-}
 
 export {};
